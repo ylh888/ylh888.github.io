@@ -38,6 +38,8 @@ function calculateDim4Square() {
 
 function setup() {
 
+  console.log(navigator.userAgent)
+
   let isMobile = {
     Android: function () {
       return navigator.userAgent.match(/Android/i);
