@@ -243,6 +243,8 @@ function draw() {
 
   let midiNum = map(hue(thispixel), 0, 359, 40, 110)
 
+    getAudioContext().resume();
+
   yosc.freq(midiToFreq(midiNum))
   if (!AUDIOOUT) {
     yosc.freq(0)
