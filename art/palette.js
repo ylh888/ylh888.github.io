@@ -38,8 +38,6 @@ function calculateDim4Square() {
 
 function setup() {
 
-  console.log(navigator.userAgent)
-
   let isMobile = {
     Android: function () {
       return navigator.userAgent.match(/Android/i);
@@ -242,8 +240,7 @@ function draw() {
 
 
   let midiNum = map(hue(thispixel), 0, 359, 40, 110)
-
-    getAudioContext().resume();
+  getAudioContext().resume();
 
   yosc.freq(midiToFreq(midiNum))
   if (!AUDIOOUT) {
