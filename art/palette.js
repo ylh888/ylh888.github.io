@@ -32,8 +32,8 @@ function calculateDim() {
   circleDim = floor(Math.pow(width * lheight / nPalettes, 0.5)) - 2
 }
 function calculateDim4Square() {
-  let x=min(width,lheight)
-  circleDim = floor(Math.pow(x*x / nPalettes, 0.5)) - 2
+  let x = min(width, lheight)
+  circleDim = floor(Math.pow(x * x / nPalettes, 0.5)) - 2
 }
 
 function setup() {
@@ -88,11 +88,21 @@ function setup() {
   keyPressed()
   windowResized()
 
+  disableScroll()
+
   frameRate(30); // set framerate
 
   grid = makeGrid(nPalettes)
 }
 
+function disableScroll() {
+  document.body.style.overflow = 'hidden';
+  document.querySelector('html').scrollTop = window.scrollY;
+}
+
+function enableScroll() {
+  document.body.style.overflow = null;
+}
 
 
 function draw() {
@@ -146,11 +156,11 @@ function draw() {
   } else if (vignette === 3) { //grid
     calculateDim4Square()
     push()
-    translate(width/2-circleDim,lheight/2-0.5*circleDim)
-    let adj=-6
+    translate(width / 2 - circleDim, lheight / 2 - 0.5 * circleDim)
+    let adj = -6
     for (let idx = 0; idx < nPalettes; idx++) {
       fill((idx / nPalettes) * 360, 100, 100)
-      circle(grid[idx][0]*(circleDim+adj), grid[idx][1]*(circleDim+adj), circleDim+adj)
+      circle(grid[idx][0] * (circleDim + adj), grid[idx][1] * (circleDim + adj), circleDim + adj)
     }
     pop()
   }
@@ -188,7 +198,7 @@ function draw() {
     } else if (vignette === 1) { // vertical
       x = (sample / localh) + uw
       y = (sample % localh) + uh
-    } else if (vignette === 2 || vignette === 3 || vignette===4) {
+    } else if (vignette === 2 || vignette === 3 || vignette === 4) {
       x = random(0, localw) + uw
       y = random(0, localh) + uh
     }
@@ -379,7 +389,7 @@ function makeGrid(max) {
   let step = 1, cnt = 0
   let x = 0, y = 0
   let lastx = 0, lasty = 0
-  let g = [[0,0]]
+  let g = [[0, 0]]
 
   while (true) {
     for (let k = 1; k <= 2; k++) {
