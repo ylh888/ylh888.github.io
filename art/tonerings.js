@@ -136,12 +136,12 @@ function draw() {
   let nRes = 100.0
   let nOct = nRes * 12
   let pos = samplingRateSlider.value()
-  let xOct = Math.floor((pos + 850) / nOct) - 1
+  let xOct = Math.floor((pos + 850) / nOct) 
   let xStep = Math.floor(pos / nRes) % 12
 
   let xRes = pos % nRes
 
-  let freq = 440.0 * (2 ** ((pos - 49.0 * nRes) / (12.0 * nRes))) // A = 2100
+  let freq = 440.0 * (2 ** ((pos - 49.0 * nRes) / (12.0 * nRes))) // A4 = 49th key
 
 
   fill(160)
