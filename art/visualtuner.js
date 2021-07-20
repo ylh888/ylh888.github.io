@@ -1,5 +1,9 @@
 /*
+visualtuner.js : 2021-07-16 Fri
 
+vl53dist contains the frequency in this case
+
+derived from vl53 distance sensor 'air' keyboard
 tonerings.js : 2021-06-12 Sun
                                                      
 */
@@ -16,7 +20,8 @@ let AUDIOOUT = true;
 let ismobile = false;
 let yosc, yosc1, yosc2, yosc3, osc, env, env1, env2, env3, reverb;
 let sample;
-let externalSlider, onScreenSlider;
+let externalSlider, onScreenSlider, registerSlider, wavetableSlider;
+let currentRegister = 0, currentWavetable = -1;
 let nextSample = -1
 
 let uw, uh, mw, mh //local area of interest window min/max w h
@@ -30,6 +35,7 @@ let grid = []
 var vl53dist = 0
 
 
+let displayStyle = 2
 
 //let tPos = [[2,0], [2,2], [0,3], [2,4], [2,6], [4,5], [6,6], [6,4], [8,3], [6,2], [6,0], [4,1]]
 // let tPos = [[0, 2], [2, 2], [3, 0], [4, 2], [6, 2], [5, 4], [6, 6], [4, 6], [3, 8], [2, 6], [0, 6], [1, 4]]
@@ -38,6 +44,7 @@ var vl53dist = 0
 // piano key starts with A
 let tPos = [[3, 8], [2, 6], [0, 6], [1, 4], [0, 2], [2, 2], [3, 0], [4, 2], [6, 2], [5, 4], [6, 6], [4, 6], [3, 8]]
 let Keys = ["A", "A#/Bb", "B", "C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab"]
+
 
 function calculateDim() {
   circleDim = floor(Math.pow(width * lheight / nPalettes, 0.5)) - 2
@@ -68,7 +75,8 @@ function setup() {
     any: function () {
       return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
     }
-  };
+  }
+
   if (isMobile.any()) {
     ismobile = true
   } else {
@@ -109,14 +117,23 @@ function setup() {
   reverb.process(yosc2, 2, 1);
   //*/
 
+  /*
+    externalSlider = createSlider(0, 450, 0, 1);
+    externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
+    externalSlider.style('width', '75%')
+  */
 
-  externalSlider = createSlider(0, 450, 0, 1);
-  externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
-  externalSlider.style('width', '75%')
-
-  onScreenSlider = createSlider(0, 8800, 4900, 1);
+  onScreenSlider = createSlider(0, 8800, 0, 1) // or use A: 4900, 1);
   onScreenSlider.position(width * 0.125, (height / 4) * 3)
   onScreenSlider.style('width', '75%')
+
+  registerSlider = createSlider(1, 3, 2, 1) // or use A: 4900, 1);
+  registerSlider.position(width * 0.125 + width * 0.75, (height / 4) * 3 + 20)
+  registerSlider.style('width', '15%')
+
+  wavetableSlider = createSlider(0, 7, 0, 1) // or use A: 4900, 1);
+  wavetableSlider.position(width * 0.125, (height / 4) * 3 + 20)
+  wavetableSlider.style('width', '50%')
 
   sample = width * 4;
   keyPressed()
@@ -195,36 +212,50 @@ function draw() {
   strokeWeight(0.5)
 
   noStroke()
-  circleDim = width / 30
 
   let pos = onScreenSlider.value() // use position directly to calculate freq
   let freq
+  let xd
 
-  externalSlider.value(vl53dist)
+  if (currentRegister != registerSlider.value()) {
+    currentRegister = registerSlider.value()
+    console.log("Cur R:" + currentRegister)
+    xd = new Uint8Array(['$'.charCodeAt(0)]);
+    connection.write(xd)
+    xd = new Uint8Array(['R'.charCodeAt(0)]);
+    connection.write(xd)
+    xd = "" + (4 - currentRegister)
+    xd = new Uint8Array([xd.charCodeAt(0)]);
+    connection.write(xd)
+  }
+  if (currentWavetable != wavetableSlider.value()) {
+    currentWavetable = wavetableSlider.value()
+    console.log("Cur W:" + currentWavetable)
+    
+    xd = new Uint8Array(['$'.charCodeAt(0)]);
+    connection.write(xd)
+    xd = new Uint8Array(['W'.charCodeAt(0)]);
+    connection.write(xd)
+    xd = "" + currentWavetable
+    xd = new Uint8Array([xd.charCodeAt(0)]);
+    connection.write(xd)
+  }
+  // externalSlider.value(vl53dist)
 
-  console.log( vl53dist)
+  // console.log( vl53dist)
 
   let donotplay = false
 
   if (pos < 5) { // if onscreen slider is ~0 then use the external value
+    freq = vl53dist
+    if (freq < 30) freq = 30
 
-    //midinote = ((vl53dist > 25) && (vl53dist < 500)) ? (500 - vl53dist + 100) * 15 : midinote
-    // midi notes G3-G6 :: 67-103 --> 36 notes
-    // G3-C6 :: 67-96
-    const hinote = 89
-    const lonote = 62
-    let nnotes = hinote - lonote
-    const dstance = 300
-    midinote = ((vl53dist > 22) && (vl53dist < dstance)) ? lonote + Math.floor((dstance -vl53dist) / (dstance / nnotes)) : 0
-    midinote = ((vl53dist > 22) && (vl53dist < dstance)) ? lonote + ((dstance -vl53dist) / (dstance / nnotes)) : 0
+    // re-assign pos according to freq; mapping to the 88 keys
+    //pos = 49.0*nRes + Math.log2(freq/440.0) * 12.0 * nRes
+    pos = 1 + 12 * Math.log2(freq / 27.5)
+    pos = pos * nRes
 
-    if (midinote == 0) 
-      freq = oldfreq
-    else
-      freq = midiToFreq(midinote)
-    pos = (midinote - 24)* nRes
-
-  } else { // user onscreen slider's value
+  } else { // use onscreen slider's value
     freq = 440.0 * (2 ** ((pos - 49.0 * nRes) / (12.0 * nRes))) // A4 = 49th key
   }
 
@@ -235,10 +266,6 @@ function draw() {
   freq = Math.floor(freq * 100) / 100
 
 
-  fill(160)
-  textSize(height / 5)
-  text(xOct, width * 0.15, height * 0.45)
-
   fill(140)
   textSize(12)
   text("Oct " + xOct, 50, height - 90)
@@ -246,7 +273,7 @@ function draw() {
   text("pos " + pos, 50, height - 60)
   text("hRes " + xRes, 50, height - 45)
   text("freq " + freq, 50, height - 30)
-  text("dist " + vl53dist, 50, height - 10)
+  text("input " + vl53dist, 50, height - 10)
 
 
 
@@ -272,35 +299,113 @@ function draw() {
 
     yosc3.freq(freq * 7)
     env3.setRange(0.4, 0.1);
-    env3.play(yosc3)
-    //*/
+    env3.play(yosc3) //*/
   }
+
   oldfreq = freq
 
+  circleDim = width / 20
+  let radius = width * 0.3
 
-  fill(220)
-  translate(width / 3, height / 3)
-  tPos.forEach((c) => {
-    circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
-    // text(c[0],c[0]*circleDim, c[1]*circleDim+5)
-    // text(c[1],c[0]*circleDim+10, c[1]*circleDim+5)
-  })
+  let c1, c2, s1
+  s1 = xRes / nRes
+  c1 = (xStep + 1) % 12
+  c2 = xStep % 12
 
+  let tuner_diameter = width > height ? height * 0.85 : width * 0.85
 
-  let c, s
-  s = xRes / nRes
-  c = tPos[(xStep + 1) % 12]
-  fill(207)
-  circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
-  fill(120, 160, 180)
-  circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
+  if (displayStyle == 2) {
+    fill(220)
+    translate(tuner_diameter / 2, tuner_diameter / 2)
 
-  s = 1 - s
-  c = tPos[xStep % 12]
-  fill(207)
-  if (s > 0) circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
-  fill(120, 160, 180)
-  circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
+    fill(160)
+    textSize(tuner_diameter / 5)
+    text(xOct, -tuner_diameter / 20, tuner_diameter / 15)
+
+    rotate(PI * 3 / 4 - PI / 12) // rotates to start at 9 o'clock = Note A
+
+    strokeWeight(1)
+    stroke(160)
+    let inner = tuner_diameter * 0.5
+    let outter = tuner_diameter * 0.75
+    noFill()
+    circle(0, 0, inner)
+    circle(0, 0, outter)
+
+    fill(160)
+    let hour_angle = 2 * PI / 12
+    for (i = 0; i < 12; i++) {
+      rotate(hour_angle)
+      rect(inner / 2, 0, (outter - inner) / 2, 1) // clock mark
+      push();
+      translate(inner / 2, 0) // + (outter - inner)/6,0)
+      rotate(-hour_angle * (i + 11) - PI)
+      textSize(height / 50 + 4)
+      text(Keys[(i + 11) % 12], 0, 0)
+      pop();
+    }
+    rotate(hour_angle * (c1 + s1))
+    noStroke()
+
+    s1 = s1 >= 0.5 ? 0.99 - s1 : s1 //tuning: 0 closest; 0.5 farthest
+    fill(s1 * 2 * 255, (1 - s1) * 255, 0)
+    rect(inner / 2, 0, (outter - inner) / 2, 20)
+
+  } else
+    if (displayStyle == 1) {
+
+      fill(220)
+      translate(width / 2, height / 3)
+
+      fill(160)
+      textSize(height / 5)
+      text(xOct, -height / 20, height / 15)
+
+      rotate(PI * 3 / 4 - PI / 12) // rotates to start at 9 o'clock = Note A
+
+      for (i = 0; i < 12; i++) {
+
+        rotate(2 * PI / 12)
+
+        fill(207)
+        circle(radius, 0, circleDim * 2)
+
+        if (i == c1) {
+          fill(120, 160, 180)
+          circle(radius, 0, circleDim * 3 * s1)
+        } else if (i == c2) {
+          fill(120, 160, 180)
+          if (s1 != 1) circle(radius, 0, circleDim * 3 * (1 - s1))
+        }
+
+      }
+    } else { // display style == 0
+
+      fill(160)
+      textSize(height / 5)
+      text(xOct, width * 0.10, height * 0.45)
+
+      fill(220)
+      translate(width / 4, height / 5)
+
+      tPos.forEach((c) => {
+        circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
+      })
+      let s
+      s = xRes / nRes
+      c = tPos[(xStep + 1) % 12]
+      fill(207)
+      circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
+      fill(120, 160, 180)
+      circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
+
+      s = 1 - s
+      c = tPos[xStep % 12]
+      fill(207)
+      if (s > 0) circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
+      fill(120, 160, 180)
+      circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
+    }
 
   pop()
 
@@ -448,7 +553,7 @@ function draw() {
   textSize(12);
   fill(200, 100, 50);
   text("<-- click to change  midi#hue" + floor(midiNum), 50, height - 24)
-  text("" + externalSlider.value() + "ms", 156, height - 10)
+  // text("" + externalSlider.value() + "ms", 156, height - 10)
   text("+" + onScreenSlider.value(), 304, height - 10)
 
   if (DEBUG) {
@@ -556,10 +661,12 @@ function windowResized() {
   mw = width
   mh = lheight
   calculateDim()
-  externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
-  onScreenSlider.position(width * 0.125, (height / 4) * 3)
-
+  // externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
+  onScreenSlider.position(width * 0.075, (height / 4) * 3)
+  wavetableSlider.position(width * 0.075, (height / 4) * 3 + 20)
+  registerSlider.position(width * 0.075 + width * 0.60, (height / 4) * 3 + 20)
 }
+
 function keyPressed() {
   if (keyCode === 32) {
     AUDIOOUT = !AUDIOOUT;
