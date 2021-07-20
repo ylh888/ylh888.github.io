@@ -3,15 +3,14 @@ visualtuner.js : 2021-07-16 Fri
 
 vl53dist contains the frequency in this case
 
+Interacts with Open Theremin V3 (visual tuner version)
+Can set otv3's register (values = 1,2,3)
+               wave table (values = 0 ... 7)
+
 derived from vl53 distance sensor 'air' keyboard
 tonerings.js : 2021-06-12 Sun
                                                      
 */
-
-let nVignettes = 5
-let nPalettes = 100 //70 or 360 HSL
-
-let vignette = 3 // 0=x, 1=y, 2=random 3=grid 4=spiral
 
 let output = ""
 let dline = ""
@@ -20,7 +19,7 @@ let AUDIOOUT = true;
 let ismobile = false;
 let yosc, yosc1, yosc2, yosc3, osc, env, env1, env2, env3, reverb;
 let sample;
-let externalSlider, onScreenSlider, registerSlider, wavetableSlider;
+let externalSlider, onScreenSlider, registerSlider, wavetableSlider, displaySlider;
 let currentRegister = 0, currentWavetable = -1;
 let nextSample = -1
 
@@ -34,25 +33,13 @@ let grid = []
 
 var vl53dist = 0
 
+let displayStyle = 2 // 2 = 'clock' style; 1 = tone ring style
 
-let displayStyle = 2
-
-//let tPos = [[2,0], [2,2], [0,3], [2,4], [2,6], [4,5], [6,6], [6,4], [8,3], [6,2], [6,0], [4,1]]
-// let tPos = [[0, 2], [2, 2], [3, 0], [4, 2], [6, 2], [5, 4], [6, 6], [4, 6], [3, 8], [2, 6], [0, 6], [1, 4]]
-// let Keys = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
 // octave starts with C
 // piano key starts with A
 let tPos = [[3, 8], [2, 6], [0, 6], [1, 4], [0, 2], [2, 2], [3, 0], [4, 2], [6, 2], [5, 4], [6, 6], [4, 6], [3, 8]]
 let Keys = ["A", "A#/Bb", "B", "C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab"]
 
-
-function calculateDim() {
-  circleDim = floor(Math.pow(width * lheight / nPalettes, 0.5)) - 2
-}
-function calculateDim4Square() {
-  let x = min(width, lheight)
-  circleDim = floor(Math.pow(x * x / nPalettes, 0.5)) - 2
-}
 
 function setup() {
 
@@ -124,16 +111,20 @@ function setup() {
   */
 
   onScreenSlider = createSlider(0, 8800, 0, 1) // or use A: 4900, 1);
-  onScreenSlider.position(width * 0.125, (height / 4) * 3)
+  onScreenSlider.position(width * 0.125, (height / 4) * 3 + 100)
   onScreenSlider.style('width', '75%')
 
-  registerSlider = createSlider(1, 3, 2, 1) // or use A: 4900, 1);
-  registerSlider.position(width * 0.125 + width * 0.75, (height / 4) * 3 + 20)
+  registerSlider = createSlider(1, 3, 2, 1) 
+  registerSlider.position(width * 0.125 + width * 0.75, (height / 4) * 3)
   registerSlider.style('width', '15%')
 
-  wavetableSlider = createSlider(0, 7, 0, 1) // or use A: 4900, 1);
-  wavetableSlider.position(width * 0.125, (height / 4) * 3 + 20)
+  wavetableSlider = createSlider(0, 7, 0, 1) 
+  wavetableSlider.position(width * 0.125, (height / 4) * 3 )
   wavetableSlider.style('width', '50%')
+
+  displaySlider = createSlider(0, 2, 2, 1) 
+  displaySlider.position(width * 0.125 + width * 0.75, (height / 4) * 3 + 50)
+  displaySlider.style('width', '15%')
 
   sample = width * 4;
   keyPressed()
@@ -149,10 +140,9 @@ function setup() {
     console.log("Web Serial NOT supported")
   }
 
-
   frameRate(30); // set framerate
 
-  grid = makeGrid(nPalettes)
+  //grid = makeGrid(nPalettes)
 }
 
 function disableScroll() {
@@ -165,46 +155,13 @@ function enableScroll() {
 }
 
 
-async function showMessageBox(title, message, buttonList) {
-  let p = new Promise(function (resolve, reject) {
-    console.log(message)
-    /*
-      let box = document.getElementById("infoBox");
-      let heading = document.getElementById("infoHeading");
-      let content = document.getElementById("infoContent");
-      var buttons = document.getElementById("infoButtons");
-      
-      heading.innerHTML = title;
-      content.innerHTML = message;
-      
-      // Clear any old buttons
-      while(buttons.firstChild) {
-          buttons.removeChild(buttons.lastChild);
-      }
-      
-      for (let b of buttonList) {
-          let btn = document.createElement("input");
-          btn.type = "button";
-          btn.value = b;
-          btn.onclick = function() {
-              box.style.display = "none";
-              resolve(b);
-          }
-          buttons.appendChild(btn);
-      }
-      box.style.display = "block";
-      */
-  });
-  return p;
-}
-
 let nRes = 100.0
 let nOct = nRes * 12
 let oldfreq = 0, midinote = 0
 
 function draw() {
 
-  background(200)
+  background(220)
   push()
   let ydim = 1
 
@@ -267,13 +224,22 @@ function draw() {
 
 
   fill(140)
+  textSize(18)
+  text( "WAVE TABLE", width * 0.075, height -  182)
+  text( "REGISTER", width * 0.075 + width * 0.60, height -182 )
+  text( "DISPLAY", width * 0.075 + width * 0.60, height -140 )
+
   textSize(12)
-  text("Oct " + xOct, 50, height - 90)
-  text("Key " + Keys[xRes < nRes / 2 ? (xStep + 11) % 12 : xStep], 50, height - 75)
+  text( "INPUT PITCH from SERIAL PORT [@left most position] or USE SLIDER", width * 0.075, height - 112 )
+
+  text("Oct " + xOct, 50, height - 60)
+  text("Key " + Keys[xRes < nRes / 2 ? (xStep + 11) % 12 : xStep], 50, height - 45)
+  text("freq " + freq, 50, height - 30)
+  /*
   text("pos " + pos, 50, height - 60)
   text("hRes " + xRes, 50, height - 45)
-  text("freq " + freq, 50, height - 30)
   text("input " + vl53dist, 50, height - 10)
+  */
 
 
 
@@ -314,6 +280,8 @@ function draw() {
 
   let tuner_diameter = width > height ? height * 0.85 : width * 0.85
 
+  displayStyle = displaySlider.value()
+
   if (displayStyle == 2) {
     fill(220)
     translate(tuner_diameter / 2, tuner_diameter / 2)
@@ -340,7 +308,7 @@ function draw() {
       push();
       translate(inner / 2, 0) // + (outter - inner)/6,0)
       rotate(-hour_angle * (i + 11) - PI)
-      textSize(height / 50 + 4)
+      textSize(height / 40 + 4)
       text(Keys[(i + 11) % 12], 0, 0)
       pop();
     }
@@ -385,7 +353,7 @@ function draw() {
       textSize(height / 5)
       text(xOct, width * 0.10, height * 0.45)
 
-      fill(220)
+      fill(210)
       translate(width / 4, height / 5)
 
       tPos.forEach((c) => {
@@ -411,159 +379,6 @@ function draw() {
 
   return
 
-  translate(width / 2, height / 2)
-  let size = 5
-  let last = [0, 0]
-  ydim = 1
-  grid.forEach((c) => {
-    line(last[0] * size, last[1] * size, c[0] * size, c[1] * size)
-    last = c
-  })   //*/
-
-  pop()
-
-  background(200)
-
-  // push()
-
-  colorMode(HSB)
-
-  noStroke()
-  let idx = 0;
-
-  calculateDim()
-
-  if (vignette < 3) {
-
-    for (let j = circleDim / 2 + 2; j < lheight; j += circleDim + 2) {
-      for (let i = circleDim / 2 + 2; i < width; i += circleDim + 2) {
-        fill((idx++ / nPalettes) * 360, 100, 100)
-        circle(i, j, circleDim)
-        if (idx >= nPalettes) break // 360
-      }
-      // lheight = (circleDim+2)*j
-      if (idx >= nPalettes) break
-    }
-  } else if (vignette === 3) { //grid
-    calculateDim4Square()
-    push()
-    translate(width / 2 - circleDim, lheight / 2 - 0.5 * circleDim)
-    let adj = -6
-    for (let idx = 0; idx < nPalettes; idx++) {
-      fill((idx / nPalettes) * 360, 100, 100)
-      circle(grid[idx][0] * (circleDim + adj), grid[idx][1] * (circleDim + adj), circleDim + adj)
-    }
-    pop()
-  }
-  else if (vignette === 4) {  //spiral
-    push()
-    for (let idx = 0; idx < nPalettes; idx++) {
-      fill((idx / nPalettes) * 360, 100, 100)
-      let xx = width / 2 + cos(idx / 2.5) * idx * circleDim / 18
-      let yy = lheight / 2 + sin(idx / 2.5) * idx * circleDim / 18
-      circle(xx, yy, circleDim)
-    }
-    pop()
-  }
-  // pop(); // restore memorized drawing style and font
-
-  // draw area of interest
-  let localw = floor(mw - uw) + 1
-  let localh = floor(mh - uh) + 1
-  strokeWeight(0.5)
-  stroke(0, 100, 100)
-  noFill()
-  rect(uw, uh, localw, localh)
-
-  let resample = false
-
-  colorMode(RGB)
-
-  if (millis() > nextSample) {
-    nextSample = millis() + 100 // externalSlider.value()
-    sample += onScreenSlider.value()
-    sample = sample % (localw * localh)
-    if (vignette === 0) { // horizontal 
-      x = (sample % localw) + uw
-      y = (sample / localw) + uh
-    } else if (vignette === 1) { // vertical
-      x = (sample / localh) + uw
-      y = (sample % localh) + uh
-    } else if (vignette === 2 || vignette === 3 || vignette === 4) {
-      x = random(0, localw) + uw
-      y = random(0, localh) + uh
-    }
-    resample = true;
-  }
-
-  // follow the mouse if it is in view
-  if (mouseX > uw && mouseX < mw && mouseY > uh && mouseY < mh) {
-    x = mouseX
-    y = mouseY
-    sample = mouseX + mouseY * mw
-  }
-
-  if (resample) {
-    thispixel = get(x, y)
-  }
-
-  // moving dot
-  stroke(20, 20, 200)
-  fill(250, 250, 0)
-  circle(x, y, 15)
-
-  let hueV = 30 + (int)(hue(thispixel) / 2.0);
-  let satV = (int)(saturation(thispixel) * 1.27);
-  let brightV = (int)(brightness(thispixel) * 1.27);
-
-
-  // circle on left - vignette
-  fill(200);
-  noStroke()
-  fill(color(thispixel));
-  circle(20, height - 20, 30)
-
-  // triangle on right - play/pause
-  strokeWeight(2)
-  if (AUDIOOUT) {
-    fill(240, 20, 20)
-    rect(width - 30, height - 28, 8, 22)
-    rect(width - 16, height - 28, 8, 22)
-  }
-  else {
-    noStroke()
-    fill(0, 0, 200)
-    triangle(width - 30, height - 30, width - 5, height - 18, width - 30, height - 6)
-  }
-
-  // circle(width - 20, height - 20, 30)
-  noStroke()
-
-
-  let midiNum = map(hue(thispixel), 0, 359, 40, 110)
-  getAudioContext().resume();
-
-  yosc.freq(midiToFreq(midiNum))
-  if (!AUDIOOUT) {
-    yosc.freq(0)
-  }
-  env.setRange(1, 0.1);
-  env.play(yosc)
-
-  textSize(12);
-  fill(200, 100, 50);
-  text("<-- click to change  midi#hue" + floor(midiNum), 50, height - 24)
-  // text("" + externalSlider.value() + "ms", 156, height - 10)
-  text("+" + onScreenSlider.value(), 304, height - 10)
-
-  if (DEBUG) {
-    dline = " x=" + floor(mouseX) + " y=" + floor(mouseY) + " w" + localw + " h" + localh + " c=" + thispixel
-    if (AUDIOOUT) dline += " Audio On"
-    if (ismobile) dline += " Mobile"
-    text(dline, 50, height - 40);
-  }
-
-  // image (pg,0,0)
 }
 
 //* disable mobile feature : no dragging mouse to set up smaller area of interest
@@ -660,11 +475,12 @@ function windowResized() {
   uw = uh = 0
   mw = width
   mh = lheight
-  calculateDim()
+
   // externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
-  onScreenSlider.position(width * 0.075, (height / 4) * 3)
-  wavetableSlider.position(width * 0.075, (height / 4) * 3 + 20)
-  registerSlider.position(width * 0.075 + width * 0.60, (height / 4) * 3 + 20)
+  wavetableSlider.position(width * 0.075,height - 180)
+  registerSlider.position(width * 0.075 + width * 0.60,height - 180)
+  displaySlider.position(width * 0.075 + width * 0.60, height - 140)
+  onScreenSlider.position(width * 0.075, height - 110)
 }
 
 function keyPressed() {
