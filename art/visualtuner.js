@@ -20,8 +20,12 @@ let ismobile = false;
 let yosc, yosc1, yosc2, yosc3, osc, env, env1, env2, env3, reverb;
 let sample;
 let externalSlider, onScreenSlider, registerSlider, wavetableSlider, displaySlider;
-let currentRegister = 0, currentWavetable = -1;
+let checkboxUseSlider;
+let currentRegister = 2, currentWavetable = 0;
+let usePort = 1
+let registerText = "--", wavetableText = "--"
 let nextSample = -1
+let tuner_diameter
 
 let uw, uh, mw, mh //local area of interest window min/max w h
 let lheight = 400 // height minus menu area at the bottom
@@ -32,6 +36,10 @@ let thispixel, x, y
 let grid = []
 
 var vl53dist = 0
+
+let nHist = 10
+let pHist = [nHist]
+let histIdx = 0
 
 let displayStyle = 2 // 2 = 'clock' style; 1 = tone ring style
 
@@ -110,21 +118,28 @@ function setup() {
     externalSlider.style('width', '75%')
   */
 
-  onScreenSlider = createSlider(0, 8800, 0, 1) // or use A: 4900, 1);
-  onScreenSlider.position(width * 0.125, (height / 4) * 3 + 100)
-  onScreenSlider.style('width', '75%')
-
-  registerSlider = createSlider(1, 3, 2, 1) 
+  registerSlider = createSlider(1, 3, 2, 1)
   registerSlider.position(width * 0.125 + width * 0.75, (height / 4) * 3)
   registerSlider.style('width', '15%')
 
-  wavetableSlider = createSlider(0, 7, 0, 1) 
-  wavetableSlider.position(width * 0.125, (height / 4) * 3 )
+  wavetableSlider = createSlider(0, 7, 0, 1)
+  wavetableSlider.position(width * 0.125, (height / 4) * 3)
   wavetableSlider.style('width', '50%')
 
-  displaySlider = createSlider(0, 2, 2, 1) 
+  displaySlider = createSlider(1, 2, 2, 1)
   displaySlider.position(width * 0.125 + width * 0.75, (height / 4) * 3 + 50)
   displaySlider.style('width', '15%')
+
+  portSlider = createSlider(0, 1, 1, 1)
+  portSlider.position(width * 0.125, (height / 4) * 3 + 50)
+  portSlider.style('width', '4%')
+
+  // checkboxUseSlider = createCheckbox('', false)
+  // checkboxUseSlider.changed(evCheckboxUseSlider)
+
+  onScreenSlider = createSlider(0, 8800, 0, 1) // or use A: 4900, 1);
+  onScreenSlider.position(width * 0.125, (height / 4) * 3 + 100)
+  onScreenSlider.style('width', '75%')
 
   sample = width * 4;
   keyPressed()
@@ -171,11 +186,14 @@ function draw() {
   noStroke()
 
   let pos = onScreenSlider.value() // use position directly to calculate freq
+  usePort = portSlider.value()
+
   let freq
   let xd
 
   if (currentRegister != registerSlider.value()) {
     currentRegister = registerSlider.value()
+    registerText = "" + currentRegister
     console.log("Cur R:" + currentRegister)
     xd = new Uint8Array(['$'.charCodeAt(0)]);
     connection.write(xd)
@@ -187,8 +205,9 @@ function draw() {
   }
   if (currentWavetable != wavetableSlider.value()) {
     currentWavetable = wavetableSlider.value()
+    wavetableText = "" + currentWavetable
     console.log("Cur W:" + currentWavetable)
-    
+
     xd = new Uint8Array(['$'.charCodeAt(0)]);
     connection.write(xd)
     xd = new Uint8Array(['W'.charCodeAt(0)]);
@@ -203,16 +222,22 @@ function draw() {
 
   let donotplay = false
 
-  if (pos < 5) { // if onscreen slider is ~0 then use the external value
+  //if (pos < 5) { // if onscreen slider is ~0 then use the external value
+  if (usePort) {
+    //AUDIOOUT = false
     freq = vl53dist
-    if (freq < 30) freq = 30
+    if (freq < 25) freq = 25
 
     // re-assign pos according to freq; mapping to the 88 keys
     //pos = 49.0*nRes + Math.log2(freq/440.0) * 12.0 * nRes
     pos = 1 + 12 * Math.log2(freq / 27.5)
     pos = pos * nRes
 
+    histIdx = (histIdx + 1) % nHist
+    pHist[histIdx] = pos
+
   } else { // use onscreen slider's value
+    //AUDIOOUT = true
     freq = 440.0 * (2 ** ((pos - 49.0 * nRes) / (12.0 * nRes))) // A4 = 49th key
   }
 
@@ -222,19 +247,27 @@ function draw() {
   let xRes = pos % nRes
   freq = Math.floor(freq * 100) / 100
 
-
   fill(140)
   textSize(18)
-  text( "WAVE TABLE", width * 0.075, height -  182)
-  text( "REGISTER", width * 0.075 + width * 0.60, height -182 )
-  text( "DISPLAY", width * 0.075 + width * 0.60, height -140 )
+  text("WAVE TABLE", width * 0.075, height - 182)
+  text(wavetableText, width * 0.075 + 120, height - 182)
+  text("REGISTER", width * 0.075 + width * 0.60, height - 182)
+  text(registerText, width * 0.075 + width * 0.60 + 100, height - 182)
+  text("DISPLAY", width * 0.075 + width * 0.60, height - 140)
 
   textSize(12)
-  text( "INPUT PITCH from SERIAL PORT [@left most position] or USE SLIDER", width * 0.075, height - 112 )
+  if (usePort) {
+    text("Input from serial port", width * (0.075 + 0.05), height - 120)
+  } else {
+    text("Using slider below for pitch", width * (0.075 + 0.05), height - 120)
+  }
+  //*/
 
   text("Oct " + xOct, 50, height - 60)
   text("Key " + Keys[xRes < nRes / 2 ? (xStep + 11) % 12 : xStep], 50, height - 45)
   text("freq " + freq, 50, height - 30)
+  textSize(9)
+  text("(c) Yih Lerh Huang 2021 ", 50, height - 10)
   /*
   text("pos " + pos, 50, height - 60)
   text("hRes " + xRes, 50, height - 45)
@@ -242,28 +275,32 @@ function draw() {
   */
 
 
-
   getAudioContext().resume();
 
   if (freq != oldfreq) {
-    yosc.freq(freq)
-    if (!AUDIOOUT) {
-      yosc.freq(0)
+    let fq
+
+    if (!AUDIOOUT || freq <=25 ) {
+      fq=0
+    } else {
+      fq = freq
     }
+
+    yosc.freq(fq)
 
     env.setRange(1, 0.1);
     env.play(yosc)
 
     //*
-    yosc1.freq(freq * 2)
+    yosc1.freq(fq * 2)
     env1.setRange(0.5, 0.1);
     env1.play(yosc1)
 
-    yosc2.freq(freq * 4)
+    yosc2.freq(fq * 4)
     env2.setRange(0.4, 0.1);
     env2.play(yosc2)
 
-    yosc3.freq(freq * 7)
+    yosc3.freq(fq * 7)
     env3.setRange(0.4, 0.1);
     env3.play(yosc3) //*/
   }
@@ -271,14 +308,13 @@ function draw() {
   oldfreq = freq
 
   circleDim = width / 20
-  let radius = width * 0.3
 
   let c1, c2, s1
   s1 = xRes / nRes
   c1 = (xStep + 1) % 12
   c2 = xStep % 12
 
-  let tuner_diameter = width > height ? height * 0.85 : width * 0.85
+  tuner_diameter = width > height ? height * 0.85 : width * 0.85
 
   displayStyle = displaySlider.value()
 
@@ -312,24 +348,34 @@ function draw() {
       text(Keys[(i + 11) % 12], 0, 0)
       pop();
     }
-    rotate(hour_angle * (c1 + s1))
+    // rotate(hour_angle * (c1 + s1))
+    rotate(hour_angle)
+    rotate(hour_angle * (c2 + s1))
     noStroke()
 
-    s1 = s1 >= 0.5 ? 0.99 - s1 : s1 //tuning: 0 closest; 0.5 farthest
-    fill(s1 * 2 * 255, (1 - s1) * 255, 0)
-    rect(inner / 2, 0, (outter - inner) / 2, 20)
+    if (freq > 25) {
+      s1 = s1 >= 0.5 ? 0.99 - s1 : s1 //tuning: 0 closest; 0.5 farthest
+
+      let thick = width * 0.02 * (0.7-s1) * 3
+      //fill(s1 * 2 * 255, (1 - s1) * 255, 0)
+      // fill(s1*2*155+100, (1-s1) * 80 +174, 0)
+      fill(s1 * 2 * 255, (1 - s1) * 255, 0)
+      rect(inner / 2, - thick, (outter - inner) / 2, thick)
+    }
 
   } else
     if (displayStyle == 1) {
 
-      fill(220)
-      translate(width / 2, height / 3)
+      let radius = tuner_diameter * 0.3
+      circleDim = radius / 5
+      translate(tuner_diameter / 2, tuner_diameter / 2)
 
       fill(160)
-      textSize(height / 5)
-      text(xOct, -height / 20, height / 15)
+      textSize(tuner_diameter / 5)
+      text(xOct, -tuner_diameter / 20, tuner_diameter / 15)
 
       rotate(PI * 3 / 4 - PI / 12) // rotates to start at 9 o'clock = Note A
+
 
       for (i = 0; i < 12; i++) {
 
@@ -338,12 +384,14 @@ function draw() {
         fill(207)
         circle(radius, 0, circleDim * 2)
 
-        if (i == c1) {
-          fill(120, 160, 180)
-          circle(radius, 0, circleDim * 3 * s1)
-        } else if (i == c2) {
-          fill(120, 160, 180)
-          if (s1 != 1) circle(radius, 0, circleDim * 3 * (1 - s1))
+        if (freq > 25) {
+          if (i == c1) {
+            fill(120, 160, 180)
+            circle(radius, 0, circleDim * 3 * s1)
+          } else if (i == c2) {
+            fill(120, 160, 180)
+            if (s1 != 1) circle(radius, 0, circleDim * 3 * (1 - s1))
+          }
         }
 
       }
@@ -359,18 +407,17 @@ function draw() {
       tPos.forEach((c) => {
         circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
       })
-      let s
-      s = xRes / nRes
-      c = tPos[(xStep + 1) % 12]
+      // s = xRes / nRes
+      let c = tPos[(xStep + 1) % 12]
       fill(207)
       circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
       fill(120, 160, 180)
-      circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
+      circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s1)
 
-      s = 1 - s
+      s1 = 1 - s1
       c = tPos[xStep % 12]
       fill(207)
-      if (s > 0) circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
+      if (s1 > 0) circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2)
       fill(120, 160, 180)
       circle(c[0] * circleDim, c[1] * circleDim, circleDim * 2 * s)
     }
@@ -464,7 +511,6 @@ function touchEnded() {
 }
 //*/
 
-
 function nextVignette() {
   vignette = (vignette + 1) % nVignettes;
 }
@@ -477,10 +523,12 @@ function windowResized() {
   mh = lheight
 
   // externalSlider.position(width * 0.125, (height / 4) * 3 + 20)
-  wavetableSlider.position(width * 0.075,height - 180)
-  registerSlider.position(width * 0.075 + width * 0.60,height - 180)
+  wavetableSlider.position(width * 0.075, height - 180)
+  registerSlider.position(width * 0.075 + width * 0.60, height - 180)
   displaySlider.position(width * 0.075 + width * 0.60, height - 140)
   onScreenSlider.position(width * 0.075, height - 110)
+  portSlider.position(width * 0.075, height - 135)
+  // checkboxUseSlider.position(width * 0.075, height - 130)
 }
 
 function keyPressed() {
@@ -490,6 +538,8 @@ function keyPressed() {
   }
   return false
 }
+
+
 
 
 // makeGrid (#points) : 2020-11-02 Mon : spiral square
@@ -523,6 +573,13 @@ function makeGrid(max) {
   return g
 }
 
+function evCheckboxUseSlider() {
+  if (this.checked()) {
+    AUDIOOUT = true
+  } else {
+    AUDIOOUT = false
+  }
+}
 
 /* from Cam2Music in Processing
 void draw() {
