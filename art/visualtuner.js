@@ -4,7 +4,7 @@ visualtuner.js : 2021-07-16 Fri
 vl53dist contains the frequency in this case
 
 Interacts with Open Theremin V3 (visual tuner version)
-Can set otv3's register (values = 1,2,3)
+Can set otv4's register (values = 0,1,2,3) 0=use knobs' values
                wave table (values = 0 ... 7)
 
 derived from vl53 distance sensor 'air' keyboard
@@ -118,7 +118,7 @@ function setup() {
     externalSlider.style('width', '75%')
   */
 
-  registerSlider = createSlider(1, 3, 2, 1)
+  registerSlider = createSlider(0, 3, 0, 1)
   registerSlider.position(width * 0.125 + width * 0.75, (height / 4) * 3)
   registerSlider.style('width', '15%')
 
@@ -150,7 +150,7 @@ function setup() {
 
   if (connection.isSupported()) {
     console.log("Web Serial is supported")
-    setTimeout(() => { connection.open() }, 2000)
+    setTimeout(() => { connection.open() }, 5000)
   } else {
     console.log("Web Serial NOT supported")
   }
